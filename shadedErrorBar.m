@@ -1,4 +1,4 @@
-function varargout=shadedErrorBar(x,y,errBar,varargin)
+function varargout = shadedErrorBar(x, y, errBar, varargin)
 % generate continuous error bar area around a line plot
 %
 % function H=shadedErrorBar(x,y,errBar, ...)
@@ -6,7 +6,6 @@ function varargout=shadedErrorBar(x,y,errBar,varargin)
 % Purpose 
 % Makes a 2-d line plot with a pretty shaded error bar made
 % using patch. Error bar color is chosen automatically.
-%
 %
 % Inputs (required)
 % x - vector of x values [optional, can be left empty]
@@ -32,11 +31,8 @@ function varargout=shadedErrorBar(x,y,errBar,varargin)
 %               to OpenGL, however this makes a raster image.
 % 'patchSaturation'- [0.2 by default] The saturation of the patch color.
 %
-%
-%
 % Outputs
 % H - a structure of handles to the generated plot objects.
-%
 %
 % Examples:
 % y=randn(30,80); 
@@ -62,10 +58,7 @@ function varargout=shadedErrorBar(x,y,errBar,varargin)
 % shadedErrorBar(x,y,{@mean,@std},'lineprops','-b','transparent',1);
 % hold off
 %
-%
 % Rob Campbell - November 2009
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Parse input arguments
@@ -74,123 +67,133 @@ narginchk(3,inf)
 params = inputParser;
 params.CaseSensitive = false;
 params.addParameter('lineProps', '-k', @(x) ischar(x) | iscell(x));
-params.addParameter('transparent', true, @(x) islogical(x) || x==0 || x==1);
-params.addParameter('patchSaturation', 0.2, @(x) isnumeric(x) && x>=0 && x<=1);
+params.addParameter('transparent', true, @(x) islogical(x) || x == 0 || x == 1);
+params.addParameter('patchSaturation', 0.2, @(x) isnumeric(x) && x >= 0 && x <= 1);
+
+% Extract Axes related variable
+if sum(contains(varargin(1:2:end), {'Parent'}))
+    get_parent = find(contains(varargin(1:2:end), {'Parent'}))*2 - 1;
+    parent_axes = varargin{get_parent + 1};
+    varargin = varargin(setdiff(1:numel(varargin), ...
+        [get_parent, get_parent + 1]));
+else
+    parent_axes = gca;
+end
 
 params.parse(varargin{:});
 
 %Extract values from the inputParser
-lineProps =  params.Results.lineProps;
-transparent =  params.Results.transparent;
+lineProps = params.Results.lineProps;
+transparent = params.Results.transparent;
 patchSaturation = params.Results.patchSaturation;
 
-if ~iscell(lineProps), lineProps={lineProps}; end
-
+if ~iscell(lineProps), lineProps = {lineProps}; end
 
 %Process y using function handles if needed to make the error bar dynamically
 if iscell(errBar) 
-    fun1=errBar{1};
-    fun2=errBar{2};
-    errBar=fun2(y);
-    y=fun1(y);
+    fun1 = errBar{1};
+    fun2 = errBar{2};
+    errBar = fun2(y);
+    y = fun1(y);
 else
-    y=y(:).';
+    y = y(:).';
 end
 
 if isempty(x)
-    x=1:length(y);
+    x = 1:length(y);
 else
-    x=x(:).';
+    x = x(:).';
 end
 
-
 %Make upper and lower error bars if only one was specified
-if length(errBar)==length(errBar(:))
-    errBar=repmat(errBar(:)',2,1);
+if length(errBar) == length(errBar(:))
+    errBar = repmat(errBar(:)', 2, 1);
 else
-    s=size(errBar);
-    f=find(s==2);
+    s = size(errBar);
+    f = find(s == 2);
     if isempty(f), error('errBar has the wrong size'), end
-    if f==2, errBar=errBar'; end
+    if f == 2, errBar = errBar'; end
 end
 
 if length(x) ~= length(errBar)
     error('length(x) must equal length(errBar)')
 end
 
+%log the hold status so we don't change
+initialHoldStatus = ishold;
 
-%Log the hold status so we don't change
-initialHoldStatus=ishold;
-if ~initialHoldStatus, hold on,  end
-
-H = makePlot(x,y,errBar,lineProps,transparent,patchSaturation);
-
-if ~initialHoldStatus, hold off, end
-
-if nargout==1
-    varargout{1}=H;
+if ~initialHoldStatus
+    hold(parent_axes, 'on')
 end
 
+H = makePlot(x, y, errBar, lineProps, ...
+    transparent, patchSaturation, parent_axes);
 
+if ~initialHoldStatus
+    hold(parent_axes, 'off')
+end
 
-function H = makePlot(x,y,errBar,lineProps,transparent,patchSaturation)
+if nargout == 1
+    varargout{1} = H;
+end
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Plot to get the parameters of the line
+end
 
-    H.mainLine=plot(x,y,lineProps{:});
+function H = makePlot(x, y, errBar, lineProps, ...
+    transparent, patchSaturation, parent_axes)
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot to get the parameters of the line
 
-    % Work out the color of the shaded region and associated lines.
-    % Here we have the option of choosing alpha or a de-saturated
-    % solid colour for the patch surface.
-    mainLineColor=get(H.mainLine,'color');
-    edgeColor=mainLineColor+(1-mainLineColor)*0.55;
+H.mainLine = plot(x, y, lineProps{:}, 'Parent', parent_axes);
 
-    if transparent
-        faceAlpha=patchSaturation;
-        patchColor=mainLineColor;
-    else
-        faceAlpha=1;
-        patchColor=mainLineColor+(1-mainLineColor)*(1-patchSaturation);
-    end
+% Work out the color of the shaded region and associated lines.
+% Here we have the option of choosing alpha or a de-saturated
+% solid colour for the patch surface.
+mainLineColor = get(H.mainLine, 'color');
+edgeColor = mainLineColor + (1 - mainLineColor)*0.55;
 
+if transparent
+    faceAlpha = patchSaturation;
+    patchColor = mainLineColor;
+else
+    faceAlpha = 1;
+    patchColor = mainLineColor + (1 - mainLineColor)*(1 - patchSaturation);
+end
 
-    %Calculate the error bars
-    uE=y+errBar(1,:);
-    lE=y-errBar(2,:);
+%Calculate the error bars
+uE = y + errBar(1, :);
+lE = y - errBar(2, :);
 
+%Add the patch error bar
 
-    %Add the patch error bar
+%Make the patch
+yP = [lE, fliplr(uE)];
+xP = [x, fliplr(x)];
 
+%remove nans otherwise patch won't work
+xP(isnan(yP)) = [];
+yP(isnan(yP)) = [];
 
+if(isdatetime(x))
+    H.patch = patch(datenum(xP), yP, 1, ...
+        'Parent', parent_axes);
+else
+    H.patch = patch(xP, yP, 1, ...
+        'Parent', parent_axes);
+end
 
-    %Make the patch
-    yP=[lE,fliplr(uE)];
-    xP=[x,fliplr(x)];
+set(H.patch, 'facecolor', patchColor, ...
+    'edgecolor', 'none', ...
+    'facealpha', faceAlpha)
 
-    %remove nans otherwise patch won't work
-    xP(isnan(yP))=[];
-    yP(isnan(yP))=[];
+%Make pretty edges around the patch. 
+H.edge(1) = plot(x, lE, '-', 'color', edgeColor, ...
+    'Parent', parent_axes);
+H.edge(2) = plot(x, uE, '-', 'color', edgeColor, ...
+    'Parent', parent_axes);
 
+% Bring the main line to the top
+uistack(H.mainLine, 'top')
 
-    if(isdatetime(x))
-        H.patch=patch(datenum(xP),yP,1,'HandleVisibility','off');
-    else
-        H.patch=patch(xP,yP,1,'HandleVisibility','off');
-    end
-
-    set(H.patch,'facecolor',patchColor, ...
-        'edgecolor','none', ...
-        'facealpha',faceAlpha)
-
-
-    %Make pretty edges around the patch. 
-    H.edge(1)=plot(x,lE,'-','color',edgeColor,'HandleVisibility','off');
-    H.edge(2)=plot(x,uE,'-','color',edgeColor,'HandleVisibility','off');
-
-
-
-    uistack(H.mainLine,'top') % Bring the main line to the top
-
-
+end
